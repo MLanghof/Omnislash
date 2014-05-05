@@ -1,62 +1,72 @@
-
 final float BAT = 1.6;
 final float FRONTSWING = 0.33;
 final int IAS_COUNT = 400+80 + 1;
 
 final int LEVEL = 3;
-final int[] SLASHES = { 3, 6, 9, 1 };
+final int[] SLASHES = { 3, 6, 9, 12 };
 final int MAX_SLASHES = SLASHES[LEVEL];
-final int MAX_HITS = round(MAX_SLASHES * 1.3) + 1;
+final int MAX_HITS = round(MAX_SLASHES * 1.1) + 2; // Empirical approximation, seems to hold fine for the considered cases.
 
 int[][] results;
-//float maxResult[];
+
+// Screw allcaps constants, I'm hungry and don't want to go through renaming all this. Forgive me.
+final int incrementIAS = 1; // 1 pixel per IAS regardless...
+final int ticksIAS = 20;
+final float hitScaling = 20;
+
+int startMillis;
 
 void setup()
 {
-  size(560, 400);
+  size(530, round(hitScaling * MAX_HITS + 70));
   
-  
+  startMillis = millis();
   
   results = new int[IAS_COUNT][MAX_HITS];
-  //maxResult = new float[IAS_COUNT];
   for (int i = 0; i < IAS_COUNT; i++)
   {
     results[i] = new int[MAX_HITS];
-    //maxResult[i] = 0;
   }
-  
 }
 
 int simsPerFrame = 1000;
 int simCount = 0;
 
 void draw()
-{
-  println(frameRate);
-  
-  int incrementIAS = 1;
-  float hitIncrement = 20;
-  
+{  
   for (int i = 0; i < simsPerFrame; i++)
   {
+    // Simulate all IAS values every time.
     for (int j = 0; j < IAS_COUNT; j += incrementIAS)
     {
       int hits = SimulateOnce(j - 80);
       assert(hits < MAX_HITS);
       results[j][hits]++;
-      //maxResult[j] = max(maxResult[j], results[j][hits]);
     }
     simCount++;
   }
   
+  // General setup stuff for drawing
   background(255);
   pushMatrix();
   translate(0, height);
-  translate(20, -20);
+  translate(25, -25);
   translate(80, 0);
   
+  // Draw grid
+  stroke(color(200));
+  // vertical grid
+  for (int i = -80; i <= 400; i += ticksIAS)
+  {
+    line(i, 0, i, -hitScaling * MAX_HITS - 3);
+  }
+  // horizontal grid
+  for (int i = 1; i <= MAX_HITS; i++)
+  {
+    line(-80 - 3, -i * hitScaling, 400 + 3, -i * hitScaling);
+  }
   
-  
+  // Draw distribution
   float prevAvg = 0;
   for (int i = -80; i <= 400; i += incrementIAS)
   {
@@ -68,44 +78,62 @@ void draw()
       average += j * probability;
       
       noStroke();
-      fill(color(255 * (1 - probability)));
-      rect(i, -j * hitIncrement, incrementIAS, -hitIncrement);
+      fill(color(0, 254 * (probability) + 1)); // Does this look weird? Well, (0, 0) is black!
+      rect(i, -j * hitScaling, incrementIAS, -hitScaling);
     }
     
     stroke(color(255, 0, 0));
-    line(i-incrementIAS, -prevAvg * hitIncrement, i, -average * hitIncrement);
+    line(i-incrementIAS, -prevAvg * hitScaling, i, -average * hitScaling);
     prevAvg = average;
   }  
+  
+  // Draw axes
   stroke(0);
   fill(0);
-  textAlign(CENTER, TOP);
   textSize(8);
-  line(-80 - 10, 0, IAS_COUNT - 80 + 10, 0);
-  line(0, 0, 0, -hitIncrement * MAX_HITS + 10);
-  
+  // x-axis
+  line(-80 - 10, 0, IAS_COUNT - 80 + 10, 0);  
   pushMatrix();
   translate(IAS_COUNT - 80 + 10, 0);
   line(0, 0, -2, -2);
   line(0, 0, -2, 2);
   popMatrix();
+  // y-axis
+  line(0, 0, 0, -hitScaling * MAX_HITS - 10);
+  pushMatrix();
+  translate(0, -hitScaling * MAX_HITS - 10);
+  line(0, 0, -2, 2);
+  line(0, 0, 2, 2);
+  popMatrix();
   
-  for (int i = -80; i <= 400; i += 20)
+  // x-axis labels
+  textAlign(CENTER, TOP);
+  for (int i = -80; i <= 400; i += ticksIAS)
   {
     line(i, -2, i, 2);
     
     text(str(i), i, 5);
   }
-  
-  
+  // y-axis labels (no need to start at 0)
+  textAlign(RIGHT, CENTER);
+  for (int i = 1; i < MAX_HITS+1; i++)
+  {
+    line(-2, -i * hitScaling, 2, -i * hitScaling);
+   
+    text(str(i), -80 - 6, -i * hitScaling - 1 );
+  }
   popMatrix();
   
   
   textAlign(LEFT, TOP);
   textSize(12);
-  text("Simulated: " + str(simCount), 10, 10);
+  int m = millis() - startMillis;
+  text("Simulated: " + str(simCount) +
+        " in " + str(m / 1000.0) + " seconds (" + 
+        str(simCount*1000/m) + "/second)", 10, 10);
+  
+  if (simCount == 200000) mousePressed();
 }
-
-
 
 
 int SimulateOnce(int IAS)
@@ -134,7 +162,7 @@ int SimulateOnce(int IAS)
         // Reaction delay only applies for the first attack.
         reactionDelay = 0;
       }
-      else break;
+      else break; // Will get interrupted by repositioning.
     }
     
     if (timeSpent > 0.4) cooldown = timeSpent - 0.4;
@@ -142,4 +170,10 @@ int SimulateOnce(int IAS)
     // (could just do this with timeSpent, too, but let's be elaborate) 
   }
   return finishedAttacks;
+}
+
+
+void mousePressed()
+{
+  saveFrame("Omnislash_" + str(LEVEL+1) + ".png");
 }
