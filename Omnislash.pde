@@ -22,6 +22,9 @@ final float hitScaling = 20;
 // Doing some time measurements.
 int startMillis;
 
+// MT thread count
+int THREAD_COUNT = 7;
+
 void setup()
 {
   size(530, round(hitScaling * MAX_HITS + 70));
@@ -33,25 +36,20 @@ void setup()
   {
     results[i] = new int[MAX_HITS];
   }
+  
+  // Start up MT simulation
+  for (int i = 0; i < THREAD_COUNT; i++)
+    thread("SimulationThread");
+   
+  frameRate(24);
 }
 
 int simsPerFrame = 1000;
 int simCount = 0;
 
 void draw()
-{  
-  // Run a few simulations
-  for (int i = 0; i < simsPerFrame; i++)
-  {
-    // Simulate all IAS values every time.
-    for (int j = 0; j < IAS_COUNT; j += incrementIAS)
-    {
-      int hits = SimulateOnce(j - 80);
-      assert(hits < MAX_HITS);
-      results[j][hits]++;
-    }
-    simCount++;
-  }
+{ 
+  // (Simulation runs in an extra thread)
   
   // Draw the results so far
   
@@ -144,51 +142,14 @@ void draw()
   // Output when 200k simulations are done.
   if (simCount == 200000) mousePressed();
   
-  /*// Theoretical max reached? 
+  // Theoretical max reached? 
   if (results[480][16] > 0)
   {
     println(results[480][16]);
-  }*/
-}
-
-// Simulates one "cast" of Omnislash
-int SimulateOnce(int IAS)
-{
-  int finishedAttacks = 0;
-  
-  // Attack cooldown that will be left after the next jump
-  float remainingCooldown = 0;
-  float attackTime = BAT / (1.0 + IAS / 100.0);
-  float frontswingTime = FRONTSWING / (1.0 + IAS / 100.0);
-  
-  for (int slash = 0; slash < MAX_SLASHES; slash++)
-  {
-    // Time already passed during this slash
-    float timeSpent = 0;
-    float reactionDelay = random(0.25);
-    // Nothing can happen for the remaining attack cooldown or reaction delay, whichever is longer
-    timeSpent = max(remainingCooldown, reactionDelay);
-    
-    while (true)
-    {
-      // Still have time to complete frontswing?
-      if (timeSpent + frontswingTime < 0.4)
-      {
-        // Yes, attack connects.
-        finishedAttacks++;
-        // No new attack can be started until attackTime has passed.
-        timeSpent += attackTime;
-      }
-      else break; // Will get interrupted by repositioning.
-    }
-
-    if (timeSpent > 0.4) remainingCooldown = timeSpent - 0.4;
-    else remainingCooldown = 0;
-    // (could just do this using only timeSpent, too, but let's be elaborate) 
   }
-  
-  return finishedAttacks;
 }
+
+
 
 void mousePressed()
 {
