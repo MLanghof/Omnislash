@@ -1,19 +1,25 @@
-final float BAT = 1.6;
+final float BAT = 1.5;
 final float FRONTSWING = 0.33;
 final int IAS_COUNT = 400+80 + 1;
 
-final int LEVEL = 3;
+final int LEVEL = 3; // Zero-based. Deal with it.
 final int[] SLASHES = { 3, 6, 9, 12 };
 final int MAX_SLASHES = SLASHES[LEVEL];
-final int MAX_HITS = round(MAX_SLASHES * 1.1) + 2; // Empirical approximation, seems to hold fine for the considered cases.
+final int MAX_HITS = round(MAX_SLASHES * 1.3) + 2; // Empirical approximation, seems to hold fine for the considered cases.
+// (Increase the factor if you run into assertion errors for other inputs...)
 
 int[][] results;
 
 // Screw allcaps constants, I'm hungry and don't want to go through renaming all this. Forgive me.
-final int incrementIAS = 1; // 1 pixel per IAS regardless...
+final int incrementIAS = 1; // Discretisation for IAS, you can use higher values for faster simulations
+// For drawing, we always use 1 pixel per point of IAS regardless...
+
+// Tick distance for axis labels
 final int ticksIAS = 20;
+// Drawing height per hit
 final float hitScaling = 20;
 
+// Doing some time measurements.
 int startMillis;
 
 void setup()
@@ -34,6 +40,7 @@ int simCount = 0;
 
 void draw()
 {  
+  // Run a few simulations
   for (int i = 0; i < simsPerFrame; i++)
   {
     // Simulate all IAS values every time.
@@ -45,6 +52,8 @@ void draw()
     }
     simCount++;
   }
+  
+  // Draw the results so far
   
   // General setup stuff for drawing
   background(255);
@@ -124,7 +133,7 @@ void draw()
   }
   popMatrix();
   
-  
+  // Label at the top
   textAlign(LEFT, TOP);
   textSize(12);
   int m = millis() - startMillis;
@@ -132,46 +141,54 @@ void draw()
         " in " + str(m / 1000.0) + " seconds (" + 
         str(simCount*1000/m) + "/second)", 10, 10);
   
+  // Output when 200k simulations are done.
   if (simCount == 200000) mousePressed();
+  
+  /*// Theoretical max reached? 
+  if (results[480][16] > 0)
+  {
+    println(results[480][16]);
+  }*/
 }
 
-
+// Simulates one "cast" of Omnislash
 int SimulateOnce(int IAS)
 {
   int finishedAttacks = 0;
   
-  float cooldown = 0;
+  // Attack cooldown that will be left after the next jump
+  float remainingCooldown = 0;
   float attackTime = BAT / (1.0 + IAS / 100.0);
   float frontswingTime = FRONTSWING / (1.0 + IAS / 100.0);
   
   for (int slash = 0; slash < MAX_SLASHES; slash++)
   {
+    // Time already passed during this slash
     float timeSpent = 0;
-    timeSpent += cooldown;
-    
-    // Reaction delay (only gets applied on the first attack of the chain!)
     float reactionDelay = random(0.25);
+    // Nothing can happen for the remaining attack cooldown or reaction delay, whichever is longer
+    timeSpent = max(remainingCooldown, reactionDelay);
+    
     while (true)
     {
       // Still have time to complete frontswing?
-      if (timeSpent + reactionDelay + frontswingTime < 0.4)
+      if (timeSpent + frontswingTime < 0.4)
       {
         // Yes, attack connects.
-        timeSpent += reactionDelay + attackTime;
         finishedAttacks++;
-        // Reaction delay only applies for the first attack.
-        reactionDelay = 0;
+        // No new attack can be started until attackTime has passed.
+        timeSpent += attackTime;
       }
       else break; // Will get interrupted by repositioning.
     }
-    
-    if (timeSpent > 0.4) cooldown = timeSpent - 0.4;
-    else cooldown = 0;
-    // (could just do this with timeSpent, too, but let's be elaborate) 
+
+    if (timeSpent > 0.4) remainingCooldown = timeSpent - 0.4;
+    else remainingCooldown = 0;
+    // (could just do this using only timeSpent, too, but let's be elaborate) 
   }
+  
   return finishedAttacks;
 }
-
 
 void mousePressed()
 {
