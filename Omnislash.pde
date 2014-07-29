@@ -1,4 +1,4 @@
-final float BAT = 1.5;
+final float BAT = 1.6;
 final float FRONTSWING = 0.33;
 final int IAS_COUNT = 400+80 + 1;
 
